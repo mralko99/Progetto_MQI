@@ -51,6 +51,20 @@ def image_resize(image, width=None, height=None, inter=cv2.INTER_AREA):
 
 
 def Xml_formatter(current_annotations, mode, image, classes):
+    Sottoclassi_Person = ["Man", "Woman", "Boy", "Girl"]
+
+    classes2 = []
+    condizione = False
+    for x in Sottoclassi_Person:
+        if x in classes:
+            condizione = True
+    if condizione:
+
+        for x in classes:
+            if x not in Sottoclassi_Person:
+                classes2.append(x)
+        classes = classes2
+        classes.append("Person")
 
     size = image.shape[:2]
 
@@ -84,7 +98,12 @@ def Xml_formatter(current_annotations, mode, image, classes):
     for line in current_annotations:
         lineParts = line.split(',')
         lines.append("  " + "<object>")
-        lines.append("      " + "<name>" + dict_list[lineParts[2]] + "</name>")
+
+        # Implementare che le sottoclassi vengano convertite in macro classi
+        Nome = dict_list[lineParts[2]]
+        if Nome in Sottoclassi_Person:
+            Nome = "Person"
+        lines.append("      " + "<name>" + Nome + "</name>")
         lines.append("      " + "<pose>Unspecified</pose>")
         lines.append("      " + "<truncated>" + lineParts[9] + "</truncated>")
         lines.append("      " + "<difficult>0</difficult>")
@@ -105,17 +124,26 @@ def Xml_formatter(current_annotations, mode, image, classes):
             ymin = int(float(lineParts[6]) * 512)
             ymax = int(float(lineParts[7]) * 512)
 
-        if dict_list[lineParts[2]] == classes[0]:
+        if Nome == classes[0]:
             color = (255, 0, 0)
         if len(classes) > 1:
-            if dict_list[lineParts[2]] == classes[1]:
+            if Nome == classes[1]:
                 color = (0, 255, 0)
         if len(classes) > 2:
-            if dict_list[lineParts[2]] == classes[2]:
+            if Nome == classes[2]:
                 color = (0, 0, 255)
         if len(classes) > 3:
-            if dict_list[lineParts[2]] == classes[3]:
+            if Nome == classes[3]:
                 color = (255, 255, 0)
+        if len(classes) > 4:
+            if Nome == classes[4]:
+                color = (0, 255, 255)
+        if len(classes) > 5:
+            if Nome == classes[5]:
+                color = (255, 0, 255)
+        if len(classes) > 6:
+            if Nome == classes[5]:
+                color = (255, 255, 255)
 
         image2 = cv2.rectangle(image2, (xmin, ymin), (xmax, ymax), color, 2)
 

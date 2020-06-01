@@ -5,13 +5,15 @@ import numpy as np
 import cv2
 import os
 import random
-from Xml_formatter import Xml_formatter, image_resize
+from Xml_formatter import Xml_formatter
 
 # Modes = ["train", "validation"]
 Modes = ["train", "validation"]
-Dataset = "Dataset3/"
+Dataset = "Dataset2/"
 Final_Size = 512
 validation_ratio = 0.25
+Sottoclassi_Person = ["Man", "Woman", "Boy", "Girl"]
+Filtro_Classi = ["Human hair", "Human eye", "Human beard", "Human mouth", "Human body", "Human foot", "Human leg", "Human ear", "Human head", "Human face", "Human arm", "Human nose", "Human hand", "Sculpture", "Bronze sculpture"]
 
 # Carico i dataset a cui sono interessato e le quantità di immagini che voglio scaricare
 f = open("classes.names", "r", encoding="UTF-8")
@@ -71,6 +73,33 @@ for runMode in Modes:
             if lineParts[0] != image_id[len(image_id) - 1]:
                 image_id.append(lineParts[0])
 
+        # Implemento il filtro classi
+        class_augmentation = []
+        filter_annotations = []
+        for x in Filtro_Classi:
+            # Mi faccio una regex per caricare tutte le linee che contengono una bounding box della classe che mi interessa
+            commandStr = "grep " + dict_list[x] + " ./csv_folder/" + runMode + "-annotations-bbox.csv"
+            # Applico la regex e ottengo class_annotations array di tutte le righe che mi interessano
+            class_augmentation = subprocess.run(commandStr.split(), stdout=subprocess.PIPE).stdout.decode('utf-8')
+            class_augmentation = class_augmentation.splitlines()
+            for j in class_augmentation:
+                filter_annotations.append(j)
+        if len(filter_annotations) > 0:
+            # Mi creo un array con tutte le diverse foto di una certa classe
+            filter_image_id = []
+            filter_image_id.append(filter_annotations[0].split(',')[0])
+            for line in filter_annotations:
+                lineParts = line.split(',')
+                if lineParts[0] != filter_image_id[len(filter_image_id) - 1]:
+                    filter_image_id.append(lineParts[0])
+
+        npFilter = np.array(filter_image_id, dtype=str)
+        npImage = np.array(image_id, dtype=str)
+
+        npFilter = np.unique(npFilter)
+
+        npImage = np.setdiff1d(npImage, npFilter, assume_unique=True)
+
         # Printing immagini di interesse
         debug_0 = False
         if debug_0 is True:
@@ -78,14 +107,14 @@ for runMode in Modes:
                 print(x)
 
         # Printo quante immagini stiamo scaricando
-        print("     Stiamo scaricando", str(Data_Quantity), "immagini su", str(len(image_id)), "della classe", className)
+        print("     Stiamo scaricando", str(Data_Quantity), "immagini su", str(len(npImage)), "della classe", className)
 
         # Faccio lo shuffle delle risorse
-        # random.seed(20)
-        # random.shuffle(image_id)
+        random.seed(80)
+        random.shuffle(npImage)
 
         # Riduco le immagini che devo scaricare
-        image_id = image_id[0:Data_Quantity]
+        image_id = npImage[0:Data_Quantity]
 
         conteggio = 0
         print('      ', '-' * 10, "%.2f" % float(0), "%", end="")
@@ -106,6 +135,14 @@ for runMode in Modes:
             for i in range(len(current_annotations)):
                 lineParts = current_annotations[i].split(',')
                 for intrest in classes:
+                    # print(lineParts[2], dict_list[intrest])
+                    if lineParts[2] == dict_list[intrest]:
+                        current_annotations2.append(current_annotations[i])
+
+            # Scarto dalle current_annotations tutte le classi non di interesse
+            for i in range(len(current_annotations)):
+                lineParts = current_annotations[i].split(',')
+                for intrest in Sottoclassi_Person:
                     # print(lineParts[2], dict_list[intrest])
                     if lineParts[2] == dict_list[intrest]:
                         current_annotations2.append(current_annotations[i])
