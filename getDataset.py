@@ -2,6 +2,7 @@ import sys
 from os import listdir
 from os.path import isfile, join
 from shutil import copyfile
+import subprocess
 
 Modes = ["train", "validation"]
 Dataset = "Dataset2/"
@@ -14,11 +15,20 @@ for x in f:
         classes.append(x.strip().split("-")[0])
 f.close()
 
+for current_mode in Modes:
+    directory_mode = Dataset + current_mode
+    directory_image = Dataset + current_mode + '/image/'
+    directory_annotation = Dataset + current_mode + '/annotation/'
+
+    subprocess.run(['mkdir', directory_mode])
+    subprocess.run(['mkdir', directory_image])
+    subprocess.run(['mkdir', directory_annotation])
+
 for current_class in classes:
     for current_mode in Modes:
         mypath = Dataset + current_class + "/" + current_mode + "/review/"
         onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
         for photo in onlyfiles:
             id = photo[:16]
-            copyfile(Dataset + current_class + "/" + current_mode + "/annotation/" + id + "xml", Dataset + current_mode + "/annotation/" + id + "xml")
-            copyfile(Dataset + current_class + "/" + current_mode + "/image/" + id + "jpg", Dataset + current_mode + "/image/" + id + "jpg")
+            copyfile(Dataset + current_class + "/" + current_mode + "/annotation/" + id + ".xml", Dataset + current_mode + "/annotation/" + id + ".xml")
+            copyfile(Dataset + current_class + "/" + current_mode + "/image/" + id + ".jpg", Dataset + current_mode + "/image/" + id + ".jpg")
