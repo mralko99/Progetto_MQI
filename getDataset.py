@@ -1,34 +1,32 @@
-import sys
-from os import listdir
-from os.path import isfile, join
+from os import listdir, makedirs
+from os.path import isfile, isdir, join
 from shutil import copyfile
-import subprocess
+from scandir import scandir
 
 Modes = ["train", "validation"]
-Dataset = "Dataset2/"
+Dataset_origine = "Dataset2/"
+Dataset_destinazione = "BigData/"
 
-# Carico i dataset a cui sono interessato e le quantità di immagini che voglio scaricare
-f = open("classes.names", "r", encoding="UTF-8")
+# Carico le classi dalle cartelle nel Dataset_origine
 classes = []
-for x in f:
-    if x[0] != "#":
-        classes.append(x.strip().split("-")[0])
-f.close()
+for entry in scandir(Dataset_origine):
+    classes.append(entry.name)
 
+# Creo le directory per Dataset_destinazione image e annotation
 for current_mode in Modes:
-    directory_mode = Dataset + current_mode
-    directory_image = Dataset + current_mode + '/image/'
-    directory_annotation = Dataset + current_mode + '/annotation/'
+    directory_image = Dataset_destinazione + current_mode + '/image/'
+    directory_annotation = Dataset_destinazione + current_mode + '/annotation/'
+    if not isdir(directory_image):
+        makedirs(directory_image)
+    if not isdir(directory_annotation):
+        makedirs(directory_annotation)
 
-    subprocess.run(['mkdir', directory_mode])
-    subprocess.run(['mkdir', directory_image])
-    subprocess.run(['mkdir', directory_annotation])
-
+# Copio i file che sono presenti in tutte le review in image e annotation
 for current_class in classes:
     for current_mode in Modes:
-        mypath = Dataset + current_class + "/" + current_mode + "/review/"
+        mypath = Dataset_origine + current_class + "/" + current_mode + "/review/"
         onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
         for photo in onlyfiles:
             id = photo[:16]
-            copyfile(Dataset + current_class + "/" + current_mode + "/annotation/" + id + ".xml", Dataset + current_mode + "/annotation/" + id + ".xml")
-            copyfile(Dataset + current_class + "/" + current_mode + "/image/" + id + ".jpg", Dataset + current_mode + "/image/" + id + ".jpg")
+            copyfile(Dataset_origine + current_class + "/" + current_mode + "/annotation/" + id + ".xml", Dataset_destinazione + current_mode + "/annotation/" + id + ".xml")
+            copyfile(Dataset_origine + current_class + "/" + current_mode + "/image/" + id + ".jpg", Dataset_destinazione + current_mode + "/image/" + id + ".jpg")

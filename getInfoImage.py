@@ -1,56 +1,69 @@
-import csv
-import subprocess
 import sys
-import numpy as np
-import cv2
-from Xml_formatter import Xml_formatter
+from cv2 import imread, imwrite
+from os import listdir, remove
+from os.path import isfile, join
+from function import Xml_formatter, get_dict, get_subclass, grep, download
 
 
-Dataset = "Dataset2/"
+dict_list = get_dict(inverted=False)  # Carico il dizionario con tutte le associazioni id:class
+dict_list2 = get_dict()               # Carico il dizionario con tutte le associazioni class:id
+subclasses = get_subclass()           # Carico se ci sono le classi con le loro sottoclassi
+change_label = True                  # Decide se cambiare le label delle sottoclassi
 
+modes = ["train", "validation", "test"]
+current_mode = ""
 
-# Crea un dizionario per ogni classe con il codice per il download
-with open('./csv_folder/class-descriptions-boxable.csv', mode='r') as infile:
-    reader = csv.reader(infile)
-    dict_list = {rows[0]: rows[1] for rows in reader}
-
-Tipo = ["train", "validation", "test"]
-annotation = []
-current_type = ""
-
+# Elimino, se sono presenti immagini .jpg
+onlyfiles = [f for f in listdir("./") if isfile(join("./", f))]
+for x in onlyfiles:
+    if x[len(x) - 3:] == "jpg":
+        remove(x)
+# Se l'utente non dà un input valido al comando
 Foto = sys.argv
-if len(Foto) > 2 or len(Foto) == 1:
+if len(Foto) > 2 or len(Foto) == 1 or len(Foto[1].strip()) != 16:
     print("Errore nell'utilizzo del comando")
 else:
-    Nome = Foto[1]
+    photo_id = Foto[1].strip()
+    # Individuo la modalita e mi salvo il risultato della grep
+    for iter_mode in modes:
+        current_bbox = grep(photo_id, iter_mode)
+        if len(current_bbox) != 0:
+            current_mode = iter_mode
+            break
 
-    for i in Tipo:
-        # Mi faccio una regex per caricare tutte le linee che contengono l'immagine corrente
-        commandStr2 = "grep " + Nome + " ./csv_folder/" + i + "-annotations-bbox.csv"
-        # Applico la regex e ottengo current_annotations array di tutte le righe che mi interessano
-        current_annotations = subprocess.run(commandStr2.split(), stdout=subprocess.PIPE).stdout.decode('utf-8')
-        current_annotations = current_annotations.splitlines()
-        if len(current_annotations) != 0:
-            current_type = i
-        for x in current_annotations:
-            annotation.append(x)
+    # Mi salvo le classi delle immagini per poi stamparle
+    current_classes = []
+    for i in range(len(current_bbox)):
+        lineParts = current_bbox[i].split(',')
+        iter_class = dict_list[lineParts[2]]
+        # Se attivo la modifica delle sottoclassi
+        if change_label:
+            for x in subclasses:
+                for intrest in x[1]:
+                    if lineParts[2] == dict_list2[intrest]:
+                        # Modifico il nome della classe
+                        iter_class = x[0]
+                        # Modifico la riga della bbox
+                        modified_bbox = [lineParts[0], lineParts[1], dict_list2[x[0]]]
+                        for modified in lineParts[3:]:
+                            modified_bbox.append(modified)
+                        current_bbox[i] = ",".join(modified_bbox)
+        # Mi salvo il nome della classe se è nuovo
+        if iter_class not in current_classes:
+            current_classes.append(iter_class)
 
-    current_annotations2 = []
-    # Scarto dalle current_annotations tutte le classi non di interesse
-    for i in range(len(annotation)):
-        lineParts = annotation[i].split(',')
-        Classe = dict_list[lineParts[2]]
-        if Classe not in current_annotations2:
-            current_annotations2.append(Classe)
-
-    # Scarico l'immagine richiesta
-    subprocess.run(['aws', 's3', '--no-sign-request', '--only-show-errors', 'cp', 's3://open-images-dataset/' + current_type + '/' + Nome + ".jpg", Nome + ".jpg"])
-
-    for i in current_annotations2:
+    # Stampo le classi presenti
+    for i in current_classes:
         print(i)
 
-    image = cv2.imread(Nome + ".jpg")
+    # Scarico l'immagine richiesta
+    download(current_mode, photo_id, "./" + photo_id + ".jpg")
 
-    xml, image, image2 = Xml_formatter(annotation, current_type, image, current_annotations2)
+    # Carico la foto da file
+    image = imread(photo_id + ".jpg")
 
-    cv2.imwrite(Nome + ".jpg", image2)
+    # La passo a Xml_formatter
+    xml, image, image2 = Xml_formatter(current_bbox, current_mode, image, current_classes)
+
+    # Salvo la foto in stile review
+    imwrite(photo_id + ".jpg", image2)
