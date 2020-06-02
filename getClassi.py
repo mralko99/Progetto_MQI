@@ -36,10 +36,15 @@ for runMode in Modes:
 # CARICO TUTTE LE FOTO CHE HO GIA' SCARICATO PER NON RISCARICARLE
     # Mi scrivo il path su cui devo cercare le foto già scaricate
     downloaded_path = Dataset_filter + runMode + "/annotation/"
-    # Mi scrivo tutti gli id nelle foto già scaricate sull'array downloaded
-    downloaded = [f[:16] for f in listdir(downloaded_path) if isfile(join(downloaded_path, f))]
-    # Trasformo l'array downloaded in un np.array
-    npFile = np.array(downloaded, dtype=str)
+    # Se esiste carico le immagini già scaricate
+    if isdir(downloaded_path):
+        # Mi scrivo tutti gli id nelle foto già scaricate sull'array downloaded
+        downloaded = [f[:16] for f in listdir(downloaded_path) if isfile(join(downloaded_path, f))]
+        # Trasformo l'array downloaded in un np.array
+        npFile = np.array(downloaded, dtype=str)
+    # Sennò creo un array vuoto in quanto ci devo fare delle operazioni
+    else:
+        npFile = np.asarray([], dtype=str)
 # #
 
 # CARICO TUTTE LE FOTO IN CUI SONO PRESENTI FILTER CLASS E NE FACCIO UN NP-ARRAY
