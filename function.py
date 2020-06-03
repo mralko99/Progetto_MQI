@@ -78,12 +78,12 @@ def get_classqnt():
 
 # Funzione che carico il dizionario con tutte le associazioni class:id(Predefinito) se inverted=False id:class
 def get_dict(inverted=True):
-    with open('./csv_folder/class-descriptions-boxable.csv', mode='r') as infile:
-        reader = csv.reader(infile)
-        if inverted:
-            dict_list = {rows[1]: rows[0] for rows in reader}
-        else:
-            dict_list = {rows[0]: rows[1] for rows in reader}
+    f = open("csv_folder/class-descriptions-boxable.csv", "r", encoding="UTF-8")
+    reader = csv.reader(f)
+    if inverted:
+        dict_list = {rows[1]: rows[0] for rows in reader}
+    else:
+        dict_list = {rows[0]: rows[1] for rows in reader}
     return dict_list
 
 

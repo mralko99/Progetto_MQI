@@ -4,7 +4,7 @@ from shutil import copyfile
 from scandir import scandir
 
 Modes = ["train", "validation"]
-Dataset_origine = "Dataset2/"
+Dataset_origine = "Dataset/"
 Dataset_destinazione = "BigData/"
 
 # Carico le classi dalle cartelle nel Dataset_origine
