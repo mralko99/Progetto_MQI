@@ -78,7 +78,7 @@ def get_classqnt():
 
 # Funzione che carico il dizionario con tutte le associazioni class:id(Predefinito) se inverted=False id:class
 def get_dict(inverted=True):
-    f = open("./csv_folder/class-descriptions-boxable.csv", "r", encoding="UTF-8")
+    f = open("class-descriptions-boxable.csv", "r", encoding="UTF-8")
     reader = csv.reader(f)
     if inverted:
         dict_list = {rows[1]: rows[0] for rows in reader}
@@ -89,7 +89,7 @@ def get_dict(inverted=True):
 
 # Funzione ottimizzata per fare le regex
 def grep(query, current_mode):
-    commandStr = "grep " + query + " ./csv_folder/" + current_mode + "-annotations-bbox.csv"
+    commandStr = "grep " + query + " " + current_mode + "-annotations-bbox.csv"
     finding = subprocess.run(commandStr.split(), stdout=subprocess.PIPE).stdout.decode('utf-8')
     finding = finding.splitlines()
     return finding
