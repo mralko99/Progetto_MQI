@@ -4,7 +4,7 @@ import random as rnd
 from shutil import rmtree
 from os import mkdir, makedirs, listdir
 from os.path import join, isfile, isdir
-from function import Xml_formatter, get_subclass, get_classfilter, get_classqnt, grep, get_dict, download
+from function import get_subclass, get_classfilter, get_classqnt, grep, get_dict, download, xml_generator, image_resize, box_drawer
 
 # VARIABILI GLOBALI
 Modes = ["train", "validation"]     # Imposto le modes che andrà a scaricare
@@ -17,6 +17,7 @@ class_filter = get_classfilter()    # Carico le classi che verranno filtrate dal
 subclasses = get_subclass()         # Carico se ci sono le classi con le loro sottoclassi
 dict_list = get_dict()               # Carico il dizionario con tutte le associazioni class:id
 rnd.seed(80)                        # Imposto il seed
+Filtri = [True, True, True]
 
 
 # REINIZZIALIZZO LA CARTELLA DATASET
@@ -31,9 +32,10 @@ if not isdir(Dataset):
 # Itero tutto il codice per le modes
 for runMode in Modes:
 
-    print('-Creo l\'array filtri in', runMode, 'set')
+    print('-Scarichiamo il', runMode, 'set')
 
-# CARICO TUTTE LE FOTO CHE HO GIA' SCARICATO PER NON RISCARICARLE
+    print('   Carico le immagini che ho già scaricato')
+    # CARICO TUTTE LE FOTO CHE HO GIA' SCARICATO PER NON RISCARICARLE
     # Mi scrivo il path su cui devo cercare le foto già scaricate
     downloaded_path = Dataset_filter + runMode + "/annotation/"
     # Se esiste carico le immagini già scaricate
@@ -45,30 +47,49 @@ for runMode in Modes:
     # Sennò creo un array vuoto in quanto ci devo fare delle operazioni
     else:
         npFile = np.asarray([], dtype=str)
-# #
+    # #
 
 # CARICO TUTTE LE FOTO IN CUI SONO PRESENTI FILTER CLASS E NE FACCIO UN NP-ARRAY
     # Creo un array vuoto
     filter_id = []
-    # Itero su le classi di filtro
-    for x in class_filter:
+
+    if Filtri[0]:
+        print('   Carico le classi di filtro')
+        # Itero su le classi di filtro
+        for x in range(len(class_filter)):
+            full_progbar = 10
+            filled_progbar = round(x / len(class_filter) * full_progbar)
+            print('\r       ', '#' * filled_progbar + '-' * (full_progbar - filled_progbar), 'Classi:', x + 1, '/', len(class_filter), end="", flush=True)
+            # Faccio la grep (trovo le righe contenenti ...) con il nome della classe filtro
+            filter_bbox = grep(dict_list[class_filter[x]], runMode)
+
+            # Itero sulle linee che ho trovato
+            for line in filter_bbox:
+                filter_id.append(line[:16])
+
+    print()
+    if Filtri[1]:
+        print('   Carico tutte le immagini che sono depiction')
         # Faccio la grep (trovo le righe contenenti ...) con il nome della classe filtro
-        filter_bbox = grep(dict_list[x], runMode)
+        filter_bbox = grep("[0-1],[0-1],[0-1],1,[0-1]", runMode)
         # Itero sulle linee che ho trovato
         for line in filter_bbox:
-            # Se filter id è vuoto ci carico il primo elemento
-            if len(filter_id) == 0:
-                filter_id.append(filter_bbox[0][:16])
-            # Altrimenti dopo aver controllato che non è presente nell'ultima posizione lo aggiungo
-            elif line[:16] != filter_id[len(filter_id) - 1]:
-                filter_id.append(line[:16])
+            filter_id.append(line[:16])
+
+    if Filtri[2]:
+        print('   Carico tutte le immagini che sono group')
+        # Faccio la grep (trovo le righe contenenti ...) con il nome della classe filtro
+        filter_bbox = grep("[0-1],[0-1],1,[0-1],[0-1]", runMode)
+        # Itero sulle linee che ho trovato
+        for line in filter_bbox:
+            filter_id.append(line[:16])
+
     # Trasformo tutto in un np_array
     npFilter = np.array(filter_id, dtype=str)
     # Interseco il np_array con se stesso per evitare le ripetizioni
     npFilter = np.intersect1d(npFilter, npFilter)
-# #
 
-    print('-Scarichiamo il', runMode, 'set')
+    
 
 # INIZIALIZZO LE QUANTITA DI DOWNLOAD PER LE DIVERSE MODALITA'
     # Ricarico ogni volta le quantità dall'array del file
@@ -110,27 +131,34 @@ for runMode in Modes:
         image_bbox = grep(dict_list[curr_class], runMode)
         # Itero sulle linee che ho trovato
         for line in image_bbox:
+            lineParts = line.split(',')
+            Id_immagine = lineParts[0]
             # Se filter id è vuoto ci carico il primo elemento
             if len(image_id) == 0:
-                image_id.append(image_bbox[0][:16])
+                image_id.append(Id_immagine)
             # Altrimenti dopo aver controllato che non è presente nell'ultima posizione lo aggiungo
-            elif line[:16] != image_id[len(image_id) - 1]:
-                image_id.append(line[:16])
+            elif Id_immagine != image_id[len(image_id) - 1]:
+                image_id.append(Id_immagine)
+
         # Trasformo tutto in un np_array
         npImage = np.array(image_id, dtype=str)
-
-        # Sottraggo agli id delle immagini di interesse i filtri creati in precedenza
-        npImage = np.setdiff1d(npImage, npFilter)
+        # Elimino i duplicati in npImage
+        npImage = np.intersect1d(npImage, npImage)
+        # Elimino i file già scaricati e revisionati
         npImage = np.setdiff1d(npImage, npFile)
+        # Elimino i file già scaricati e revisionati
+        npImage = np.setdiff1d(npImage, npFilter)
+
+        # Faccio lo shuffle delle risorse
+        # rnd.shuffle(npImage)
 # #
         # Printo quante immagini stiamo scaricando
         print("     Stiamo scaricando", str(curr_qnt), "immagini su", str(len(npImage)), "della classe", curr_class)
 
-        # Faccio lo shuffle delle risorse
-        rnd.shuffle(npImage)
-
         # Riduco l'array delle immagini che devo scaricare
         npImage = npImage[0:curr_qnt]
+
+        npFile = np.union1d(npFile, npImage)
 
         # Creo una variabile d'appoggio che mi serve per fare le print di quanti elementi ho scaricato
         cnt = 0
@@ -198,20 +226,12 @@ for runMode in Modes:
             # Leggo l'immagine che ho appena scaricato
             image = cv2.imread(directory_image + '/' + im + ".jpg")
 
-            # Chiamo la funzione che mi dai i file da mettere in annotation image e review
-            xml, image, image2 = Xml_formatter(current_bbox, runMode, image, classes)
+            size = image.shape[:2]
 
-            # Salvo la prima foto in output in image
-            cv2.imwrite(directory_image + '/' + im + ".jpg", image)
+            xml_generator(runMode, Final_Size, size, current_bbox, directory_annotation, im, True)
 
-            # Salvo la seconda foto in output in image
-            cv2.imwrite(directory_review + '/' + im + ".jpg", image2)
+            image = image_resize(image, Final_Size, directory_image, im, True)
 
-            # Salvo il file xml
-            g = open(directory_annotation + '/' + im + ".xml", "w", encoding="UTF-8")
-            for x in xml:
-                g.write(x)
-                g.write("\n")
-            g.close()
+            box_drawer(image, Final_Size, size, current_bbox, classes, directory_review, im, True)
         print()
     print()

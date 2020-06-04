@@ -4,41 +4,6 @@ import subprocess
 import numpy as np
 
 
-def image_resize(image, width=None, height=None, inter=cv2.INTER_AREA):
-
-    # Mi calcolo altezza e larghezza dalla foto
-    (h, w) = image.shape[:2]
-
-    # Vedo quale delle due dimensioni devo modificare
-    if height is not None:
-        r = height / float(h)
-        dim = (int(w * r), height)
-    elif width is not None:
-        r = width / float(w)
-        dim = (width, int(h * r))
-    else:
-        return
-
-    # Faccio il primo resize alla dimensione più grande
-    resized = cv2.resize(image, dim, interpolation=inter)
-
-    # Mi calcolo i padding
-    condizione = h < w
-    if condizione:
-        yRidimensionata = 512 / w * h
-        xOffset = 0
-        yOffset = int((512 - yRidimensionata) / 2)
-    else:
-        xRidimensionata = 512 / h * w
-        xOffset = int((512 - xRidimensionata) / 2)
-        yOffset = 0
-    # La trasformo in un immagine quadrata
-    square = np.zeros((512, 512, 3), np.uint8)
-    square[yOffset:yOffset + resized.shape[0], xOffset:xOffset + resized.shape[1]] = resized
-
-    return square
-
-
 # Funzione che carica le subclasses dal file
 def get_subclass():
     subclasses = []
@@ -78,7 +43,7 @@ def get_classqnt():
 
 # Funzione che carico il dizionario con tutte le associazioni class:id(Predefinito) se inverted=False id:class
 def get_dict(inverted=True):
-    f = open("class-descriptions-boxable.csv", "r", encoding="UTF-8")
+    f = open("./csv_folder/class-descriptions-boxable.csv", "r", encoding="UTF-8")
     reader = csv.reader(f)
     if inverted:
         dict_list = {rows[1]: rows[0] for rows in reader}
@@ -89,7 +54,7 @@ def get_dict(inverted=True):
 
 # Funzione ottimizzata per fare le regex
 def grep(query, current_mode):
-    commandStr = "grep " + query + " " + current_mode + "-annotations-bbox.csv"
+    commandStr = "grep " + query + " ./csv_folder/" + current_mode + "-annotations-bbox.csv"
     finding = subprocess.run(commandStr.split(), stdout=subprocess.PIPE).stdout.decode('utf-8')
     finding = finding.splitlines()
     return finding
@@ -100,22 +65,8 @@ def download(runMode, image, directory):
     subprocess.run(['aws', 's3', '--no-sign-request', '--only-show-errors', 'cp', 's3://open-images-dataset/' + runMode + '/' + image + ".jpg", directory])
 
 
-# Funzione che disegna le bounding box sulle immagini, fa il resize e formatta l'xml
-def Xml_formatter(current_bbox, mode, image, classes):
-    size = image.shape[:2]
-
-    # Faccio il resize, mando la dimensione più grande per essere trasformata in 512
-    condizione = size[0] < size[1]
-    if condizione:
-        image = image_resize(image, width=512)
-    else:
-        image = image_resize(image, height=512)
-
+def xml_generator(mode, dimension, original_size, current_bbox, directory=None, id=None, save=False):
     dict_list = get_dict(inverted=False)
-
-    # Mi copio l'immagine che verrà poi editata
-    image2 = np.copy(image)
-
     # Formatto il file in modo carino
     lines = []
     lines.append("<annotation>")
@@ -125,8 +76,8 @@ def Xml_formatter(current_bbox, mode, image, classes):
     lines.append("      " + "<database>Unknown</database>")
     lines.append("  " + "</source>")
     lines.append("  " + "<size>")
-    lines.append("      " + "<width>512</width>")
-    lines.append("      " + "<height>512</height>")
+    lines.append("      " + "<width>" + str(dimension) + "</width>")
+    lines.append("      " + "<height>" + str(dimension) + "</height>")
     lines.append("      " + "<depth>3</depth>")
     lines.append("  " + "</size>")
     lines.append("  " + "<segmented>0</segmented>")
@@ -145,20 +96,20 @@ def Xml_formatter(current_bbox, mode, image, classes):
         lines.append("      " + "<bndbox>")
 
         # Mi calcolo le nuove bbox
-        if condizione:
-            yRidimensionata = 512 / size[1] * size[0]
-            yOffset = int((512 - yRidimensionata) / 2)
-            xmin = int(float(lineParts[4]) * 512)
-            xmax = int(float(lineParts[5]) * 512)
+        if original_size[0] < original_size[1]:
+            yRidimensionata = dimension / original_size[1] * original_size[0]
+            yOffset = int((dimension - yRidimensionata) / 2)
+            xmin = int(float(lineParts[4]) * dimension)
+            xmax = int(float(lineParts[5]) * dimension)
             ymin = int(float(lineParts[6]) * yRidimensionata + yOffset)
             ymax = int(float(lineParts[7]) * yRidimensionata + yOffset)
         else:
-            xRidimensionata = 512 / size[0] * size[1]
-            xOffset = int((512 - xRidimensionata) / 2)
+            xRidimensionata = dimension / original_size[0] * original_size[1]
+            xOffset = int((dimension - xRidimensionata) / 2)
             xmin = int(float(lineParts[4]) * xRidimensionata + xOffset)
             xmax = int(float(lineParts[5]) * xRidimensionata + xOffset)
-            ymin = int(float(lineParts[6]) * 512)
-            ymax = int(float(lineParts[7]) * 512)
+            ymin = int(float(lineParts[6]) * dimension)
+            ymax = int(float(lineParts[7]) * dimension)
 
         lines.append("          " + "<xmin>" + str(xmin) + "</xmin>")
         lines.append("          " + "<ymin>" + str(ymin) + "</ymin>")
@@ -168,15 +119,88 @@ def Xml_formatter(current_bbox, mode, image, classes):
         lines.append("      " + "</bndbox>")
         lines.append("  " + "</object>")
 
+    lines.append("</annotation>")
+    
+    if save:
+        # Salvo il file xml
+        g = open(directory + '/' + id + ".xml", "w", encoding="UTF-8")
+        for x in lines:
+            g.write(x)
+            g.write("\n")
+        g.close()
+
+
+def image_resize(image, dimension, directory=None, id=None, save=False):
+
+    # Mi calcolo altezza e larghezza dalla foto
+    (h, w) = image.shape[:2]
+
+    # Vedo quale delle due dimensioni devo modificare
+    if h < w:
+        yRidimensionata = dimension / w * h
+        dim = (dimension, int(yRidimensionata))
+
+        xOffset = 0
+        yOffset = int((dimension - yRidimensionata) / 2)
+    else:
+        xRidimensionata = dimension / h * w
+        dim = (int(xRidimensionata), dimension)
+
+        xOffset = int((dimension - xRidimensionata) / 2)
+        yOffset = 0
+
+    # Faccio il primo resize alla dimensione più grande
+    resized = cv2.resize(image, dim, interpolation=cv2.INTER_AREA)
+
+    # La trasformo in un immagine quadrata
+    square = np.zeros((dimension, dimension, 3), np.uint8)
+    square[yOffset:yOffset + resized.shape[0], xOffset:xOffset + resized.shape[1]] = resized
+
+    if save:
+        cv2.imwrite(directory + '/' + id + ".jpg", square)
+
+    return square
+
+
+def box_drawer(image, dimension, original_size, current_bbox, classes, directory=None, id=None, save=False):
+    dict_list = get_dict(inverted=False)
+    info = []
+    for line in current_bbox:
+        lineParts = line.split(',')
+
+        # Mi salvo la classe per il colore
+        current_class = dict_list[lineParts[2]]
+
+        # Mi calcolo le nuove bbox
+        if original_size[0] < original_size[1]:
+            xRidimensionata = dimension
+            yRidimensionata = dimension / original_size[1] * original_size[0]
+            yOffset = int((dimension - yRidimensionata) / 2)
+            xmin = int(float(lineParts[4]) * dimension)
+            xmax = int(float(lineParts[5]) * dimension)
+            ymin = int(float(lineParts[6]) * yRidimensionata + yOffset)
+            ymax = int(float(lineParts[7]) * yRidimensionata + yOffset)
+        else:
+            xRidimensionata = dimension / original_size[0] * original_size[1]
+            yRidimensionata = dimension
+            xOffset = int((dimension - xRidimensionata) / 2)
+            xmin = int(float(lineParts[4]) * xRidimensionata + xOffset)
+            xmax = int(float(lineParts[5]) * xRidimensionata + xOffset)
+            ymin = int(float(lineParts[6]) * dimension)
+            ymax = int(float(lineParts[7]) * dimension)
+
         # Scelgo il colore a seconda della classe
         if current_class == classes[0]:
             color = (255, 0, 0)
+            color_name = "Blu"
         if len(classes) > 1:
             if current_class == classes[1]:
                 color = (0, 255, 0)
+                color_name = "Verde"
         if len(classes) > 2:
             if current_class == classes[2]:
                 color = (0, 0, 255)
+                color_name = "Rosso"
         if len(classes) > 3:
             if current_class == classes[3]:
                 color = (255, 255, 0)
@@ -189,8 +213,17 @@ def Xml_formatter(current_bbox, mode, image, classes):
         if len(classes) > 6:
             color = (255, 255, 255)
             print("attenzione potrebbero esserci più classi colorate allo stesso modo")
-        # Aggiungo la bbox alla foto
-        image2 = cv2.rectangle(image2, (xmin, ymin), (xmax, ymax), color, 2)
+            # Aggiungo la bbox alla foto
+        percentage = (xmax - xmin) * (ymax - ymin) / (xRidimensionata * yRidimensionata)
+        image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
+        if percentage < 0.02:
+            if int(lineParts[8]) or int(lineParts[9]):
+                color = (0, 0, 0)
+            image = cv2.putText(image, str("%.3f" % percentage) + "%", (xmin, ymin - 8), cv2.FONT_HERSHEY_SIMPLEX, 1.e-2 * (ymax - ymin), color, 2)
 
-    lines.append("</annotation>")
-    return lines, image, image2
+        info.append([current_class, percentage, [xmin, xmax, ymin, ymax], color_name, lineParts[8:13]])
+
+    if save:
+        cv2.imwrite(directory + '/' + id + ".jpg", image)
+
+    return info

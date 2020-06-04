@@ -1,14 +1,15 @@
 import sys
-from cv2 import imread, imwrite
+from cv2 import imread
 from os import listdir, remove
 from os.path import isfile, join
-from function import Xml_formatter, get_dict, get_subclass, grep, download
+from function import get_dict, get_subclass, grep, download, image_resize, box_drawer
 
 
 dict_list = get_dict(inverted=False)  # Carico il dizionario con tutte le associazioni id:class
 dict_list2 = get_dict()               # Carico il dizionario con tutte le associazioni class:id
 subclasses = get_subclass()           # Carico se ci sono le classi con le loro sottoclassi
 change_label = True                  # Decide se cambiare le label delle sottoclassi
+Final_Size = 512
 
 modes = ["train", "validation", "test"]
 current_mode = ""
@@ -53,8 +54,8 @@ else:
             current_classes.append(iter_class)
 
     # Stampo le classi presenti
-    for i in current_classes:
-        print(i)
+    #for i in current_classes:
+    #    print(i)
 
     # Scarico l'immagine richiesta
     download(current_mode, photo_id, "./" + photo_id + ".jpg")
@@ -62,8 +63,27 @@ else:
     # Carico la foto da file
     image = imread(photo_id + ".jpg")
 
-    # La passo a Xml_formatter
-    xml, image, image2 = Xml_formatter(current_bbox, current_mode, image, current_classes)
+    size = image.shape[:2]
 
-    # Salvo la foto in stile review
-    imwrite(photo_id + ".jpg", image2)
+    image = image_resize(image, Final_Size)
+
+    info = box_drawer(image, Final_Size, size, current_bbox, current_classes, ".", photo_id, True)
+    # [current_class, percentage, xmin, xmax, ymin, ymax, color_name, lineParts[8:13]]
+
+    for y in info:
+        print("Classe:", y[0], "  Colore:", y[3], "  Percentuale:", str("%.4f" % y[1]), sep="", end="")
+
+        print("  BBox:[", sep="", end="")
+        for x in range(len(y[2])):
+            if x != len(y[2]) - 1:
+                print(y[2][x], sep="", end=",")
+            else:
+                print(y[2][x], sep="", end="")
+
+        print("]  Data:[", sep="", end="")
+        for x in range(len(y[4])):
+            if x != len(y[4]) - 1:
+                print(y[4][x], sep="", end=",")
+            else:
+                print(y[4][x], sep="", end="")
+        print("]")
