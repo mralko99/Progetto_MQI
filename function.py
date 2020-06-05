@@ -120,7 +120,7 @@ def xml_generator(mode, dimension, original_size, current_bbox, directory=None, 
         lines.append("  " + "</object>")
 
     lines.append("</annotation>")
-    
+
     if save:
         # Salvo il file xml
         g = open(directory + '/' + id + ".xml", "w", encoding="UTF-8")
@@ -204,16 +204,20 @@ def box_drawer(image, dimension, original_size, current_bbox, classes, directory
         if len(classes) > 3:
             if current_class == classes[3]:
                 color = (255, 255, 0)
+                color_name = "Ciano"
         if len(classes) > 4:
             if current_class == classes[4]:
                 color = (0, 255, 255)
+                color_name = "Giallo"
         if len(classes) > 5:
             if current_class == classes[5]:
                 color = (255, 0, 255)
+                color_name = "Magenta"
         if len(classes) > 6:
             color = (255, 255, 255)
-            print("attenzione potrebbero esserci più classi colorate allo stesso modo")
-            # Aggiungo la bbox alla foto
+            color_name = "Bianco"
+
+        # Aggiungo la bbox alla foto
         percentage = (xmax - xmin) * (ymax - ymin) / (xRidimensionata * yRidimensionata)
         image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
         if percentage < 0.02:

@@ -2,9 +2,10 @@ from os import listdir, makedirs
 from os.path import isfile, isdir, join
 from shutil import copyfile
 from scandir import scandir
+import random as rnd
 
 Modes = ["train", "validation"]
-Dataset_origine = "Dataset/"
+Dataset_origine = "Dataset2/"
 Dataset_destinazione = "BigData/"
 
 # Carico le classi dalle cartelle nel Dataset_origine
@@ -23,10 +24,27 @@ for current_mode in Modes:
 
 # Copio i file che sono presenti in tutte le review in image e annotation
 for current_class in classes:
-    for current_mode in Modes:
-        mypath = Dataset_origine + current_class + "/" + current_mode + "/review/"
-        onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
-        for photo in onlyfiles:
-            id = photo[:16]
-            copyfile(Dataset_origine + current_class + "/" + current_mode + "/annotation/" + id + ".xml", Dataset_destinazione + current_mode + "/annotation/" + id + ".xml")
-            copyfile(Dataset_origine + current_class + "/" + current_mode + "/image/" + id + ".jpg", Dataset_destinazione + current_mode + "/image/" + id + ".jpg")
+    path = Dataset_origine + current_class + "/review/"
+    nomi = [f for f in listdir(path) if isfile(join(path, f))]
+
+    rnd.seed(80)
+    rnd.shuffle(nomi)
+
+    train = nomi[:int(len(nomi) * 0.8)]
+    validation = nomi[int(len(nomi) * 0.8):]
+    for photo in train:
+        id = photo[:16]
+
+        copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
+                 Dataset_destinazione + "train/annotation/" + id + ".xml")
+
+        copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
+                 Dataset_destinazione + "train/image/" + id + ".jpg")
+    for photo in validation:
+        id = photo[:16]
+
+        copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
+                 Dataset_destinazione + "validation/annotation/" + id + ".xml")
+
+        copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
+                 Dataset_destinazione + "validation/image/" + id + ".jpg")
