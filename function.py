@@ -159,7 +159,7 @@ def get_settings():
                 [Filtri2.append(y) for y in x.strip().split(",")]
     f.close()
     for x in Filtri2:
-        if x == '0':
+        if x == '1':
             Filtri.append(True)
         else:
             Filtri.append(False)
