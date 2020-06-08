@@ -20,7 +20,7 @@ for current_mode in Modes:
     directory_annotation = Dataset_destinazione + current_mode + '/annotation/'
     if not isdir(directory_image):
         makedirs(directory_image)
-    if not isdir(directory_annotation):
+    if not isdir(directory_annotation):npFilter = np.intersect1d(npFilter, npFilter)
         makedirs(directory_annotation)
 
 # Copio i file che sono presenti in tutte le review in image e annotation

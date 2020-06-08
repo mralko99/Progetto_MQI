@@ -32,6 +32,9 @@ else:
             current_mode = iter_mode
             break
 
+#    for i in current_bbox:
+#        print(i)
+
     # Mi salvo le classi delle immagini per poi stamparle
     current_classes = []
     for i in range(len(current_bbox)):
@@ -54,8 +57,8 @@ else:
             current_classes.append(iter_class)
 
     # Stampo le classi presenti
-    #for i in current_classes:
-    #    print(i)
+#    for i in current_classes:
+#        print(i)
 
     # Scarico l'immagine richiesta
     download(photo_id, "./")
@@ -67,14 +70,21 @@ else:
 
     image = image_resize(image, Final_Size)
 
-    info = box_drawer(image, Final_Size, size, current_bbox, current_classes, ".", photo_id, True)
+    info = box_drawer(image, Final_Size, size, current_bbox, current_classes, [], ".", photo_id, True)
     # [current_class, percentage, xmin, xmax, ymin, ymax, color_name, lineParts[8:13]]
-
+    max_0 = 0
+    max_1 = 0
     for y in info:
-        print("Classe:", y[0], "  Colore:", y[3], "  Percentuale:", str("%.4f" % y[1]), sep="", end="")
+        if len(y[0]) > max_0:
+            max_0 = len(y[0])
+        if len(y[3]) > max_1:
+            max_1 = len(y[3])
+    for y in info:
+        print("Classe:", y[0] + " " * (max_0 - len(y[0])), "  Colore:", y[3] + " " * (max_1 - len(y[3])), "  Percentuale:", str("%.4f" % y[1]), sep="", end="")
 
         print("  BBox:[", sep="", end="")
         for x in range(len(y[2])):
+            print("0" * (3 - len(str(y[2][x]))), sep="", end="")
             if x != len(y[2]) - 1:
                 print(y[2][x], sep="", end=",")
             else:

@@ -4,9 +4,18 @@ import numpy as np
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
+import time
 
 global s3
 s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+
+
+def track_job(job, quantity, string, update_interval=1):
+    while job._number_left > 0:
+        print('\r    ' + string + ' {:.2f}%'.format((quantity - (job._number_left * job._chunksize)) / quantity * 100), end="")
+        time.sleep(update_interval)
+    print('\r    ' + string + ' {:.2f}%'.format((quantity - (job._number_left * job._chunksize)) / quantity * 100), end="")
+    print()
 
 
 def download(id, directory):
@@ -23,7 +32,7 @@ def download(id, directory):
     s3.download_file('open-images-dataset', curr_mode + '/' + im + '.jpg', directory + '/' + im + ".jpg")
 
 
-def processing(id, condizione, dict_list, classes, subclasses, directory_annotation, directory_image, directory_review, directory_download, Final_Size):
+def processing(id, dict_list, classes, subclasses, directory_annotation, directory_image, directory_review, Final_Size, Filtri):
     modes = ["train", "validation", "test"]
 
     for iter_mode in modes:
@@ -45,12 +54,12 @@ def processing(id, condizione, dict_list, classes, subclasses, directory_annotat
         # Itero sulle classi di interesse
         for intrest in classes:
             # Se è una classe di interesse la copio
-            if lineParts[2] == dict_list[intrest]:
+            if lineParts[2] == dict_list[intrest] and Filtri[3] != bool(int(lineParts[11])):
                 current_bbox2.append(current_bbox[i])
                 break
 
         # Se non è scattata nessuna classe allora controllo le sottoclassi
-        if condizione:
+        if Filtri[4]:
             # Itero sulle sottoclassi
             for x in subclasses:
                 # Se una classe di interesse ha sottoclassi
@@ -58,7 +67,7 @@ def processing(id, condizione, dict_list, classes, subclasses, directory_annotat
                     # Itero le sottoclassi di una classe di interesse
                     for intrest in x[1]:
                         # Se è presente
-                        if lineParts[2] == dict_list[intrest]:
+                        if lineParts[2] == dict_list[intrest] and Filtri[3] != bool(int(lineParts[11])):
                             # Modifico la linea riscrivendo la classe di interesse al posto della sotto classe
                             modified_bbox = [lineParts[0], lineParts[1], dict_list[x[0]]]
                             for modified in lineParts[3:]:
@@ -71,15 +80,15 @@ def processing(id, condizione, dict_list, classes, subclasses, directory_annotat
     current_bbox = current_bbox2
 
     # Leggo l'immagine che ho appena scaricato
-    image = cv2.imread(directory_download + '/' + id + ".jpg")
+    image = cv2.imread(directory_image + '/' + id + ".jpg")
 
     size = image.shape[:2]
 
-    xml_generator(runMode, Final_Size, size, current_bbox, directory_annotation, id, True)
+    xml_generator(runMode, Final_Size, size, current_bbox, Filtri, directory_annotation, id, True)
 
     image = image_resize(image, Final_Size, directory_image, id, True)
 
-    box_drawer(image, Final_Size, size, current_bbox, classes, directory_review, id, True)
+    box_drawer(image, Final_Size, size, current_bbox, classes, Filtri, directory_review, id, True)
 
 
 def regex_map(class_mode):
@@ -155,7 +164,7 @@ def get_settings():
         if x[0] != "#":
             if len(x.strip().split(",")) == 1:
                 Dataset = x.strip()
-            if len(x.strip().split(",")) == 5:
+            if len(x.strip().split(",")) == 6:
                 [Filtri2.append(y) for y in x.strip().split(",")]
     f.close()
     for x in Filtri2:
@@ -174,7 +183,7 @@ def grep(query, current_mode):
     return finding
 
 
-def xml_generator(mode, dimension, original_size, current_bbox, directory=None, id=None, save=False):
+def xml_generator(mode, dimension, original_size, current_bbox, Filtri, directory=None, id=None, save=False):
     dict_list = get_dict(inverted=False)
     # Formatto il file in modo carino
     lines = []
@@ -192,20 +201,12 @@ def xml_generator(mode, dimension, original_size, current_bbox, directory=None, 
     lines.append("  " + "<segmented>0</segmented>")
     # Itero per le varie bbox
     for line in current_bbox:
+
         lineParts = line.split(',')
-        lines.append("  " + "<object>")
-
-        # Mi salvo la classe per il colore
-        current_class = dict_list[lineParts[2]]
-
-        lines.append("      " + "<name>" + current_class + "</name>")
-        lines.append("      " + "<pose>Unspecified</pose>")
-        lines.append("      " + "<truncated>" + lineParts[9] + "</truncated>")
-        lines.append("      " + "<difficult>0</difficult>")
-        lines.append("      " + "<bndbox>")
 
         # Mi calcolo le nuove bbox
         if original_size[0] < original_size[1]:
+            xRidimensionata = dimension
             yRidimensionata = dimension / original_size[1] * original_size[0]
             yOffset = int((dimension - yRidimensionata) / 2)
             xmin = int(float(lineParts[4]) * dimension)
@@ -214,19 +215,34 @@ def xml_generator(mode, dimension, original_size, current_bbox, directory=None, 
             ymax = int(float(lineParts[7]) * yRidimensionata + yOffset)
         else:
             xRidimensionata = dimension / original_size[0] * original_size[1]
+            yRidimensionata = dimension
             xOffset = int((dimension - xRidimensionata) / 2)
             xmin = int(float(lineParts[4]) * xRidimensionata + xOffset)
             xmax = int(float(lineParts[5]) * xRidimensionata + xOffset)
             ymin = int(float(lineParts[6]) * dimension)
             ymax = int(float(lineParts[7]) * dimension)
 
-        lines.append("          " + "<xmin>" + str(xmin) + "</xmin>")
-        lines.append("          " + "<ymin>" + str(ymin) + "</ymin>")
-        lines.append("          " + "<xmax>" + str(xmax) + "</xmax>")
-        lines.append("          " + "<ymax>" + str(ymax) + "</ymax>")
+        percentage = (xmax - xmin) * (ymax - ymin) / (xRidimensionata * yRidimensionata)
 
-        lines.append("      " + "</bndbox>")
-        lines.append("  " + "</object>")
+        if percentage < 0.01 and Filtri[5] or not Filtri[5]:
+            lines.append("  " + "<object>")
+
+            # Mi salvo la classe per il colore
+            current_class = dict_list[lineParts[2]]
+
+            lines.append("      " + "<name>" + current_class + "</name>")
+            lines.append("      " + "<pose>Unspecified</pose>")
+            lines.append("      " + "<truncated>" + lineParts[9] + "</truncated>")
+            lines.append("      " + "<difficult>0</difficult>")
+            lines.append("      " + "<bndbox>")
+
+            lines.append("          " + "<xmin>" + str(xmin) + "</xmin>")
+            lines.append("          " + "<ymin>" + str(ymin) + "</ymin>")
+            lines.append("          " + "<xmax>" + str(xmax) + "</xmax>")
+            lines.append("          " + "<ymax>" + str(ymax) + "</ymax>")
+
+            lines.append("      " + "</bndbox>")
+            lines.append("  " + "</object>")
 
     lines.append("</annotation>")
 
@@ -271,7 +287,7 @@ def image_resize(image, dimension, directory=None, id=None, save=False):
     return square
 
 
-def box_drawer(image, dimension, original_size, current_bbox, classes, directory=None, id=None, save=False):
+def box_drawer(image, dimension, original_size, current_bbox, classes, Filtri, directory=None, id=None, save=False):
     dict_list = get_dict(inverted=False)
     info = []
     for line in current_bbox:
@@ -331,11 +347,24 @@ def box_drawer(image, dimension, original_size, current_bbox, classes, directory
 
         # Aggiungo la bbox alla foto
         percentage = (xmax - xmin) * (ymax - ymin) / (xRidimensionata * yRidimensionata)
-        image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
-        if percentage < 0.02:
-            if int(lineParts[8]) or int(lineParts[9]):
-                color = (0, 0, 0)
-            image = cv2.putText(image, str("%.3f" % percentage) + "%", (xmin, ymin - 8), cv2.FONT_HERSHEY_SIMPLEX, 1.e-2 * (ymax - ymin), color, 2)
+        if len(Filtri) == 6:
+            if percentage < 0.01 and not Filtri[5]:
+                image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
+                if int(lineParts[8]) or int(lineParts[9]):
+                    color = (0, 0, 0)
+                image = cv2.putText(image, str("%.3f" % percentage) + "%", (xmin, ymin - 8), cv2.FONT_HERSHEY_SIMPLEX, 1.e-2 * (ymax - ymin), color, 2)
+            if percentage < 0.01 and Filtri[5]:
+                if int(lineParts[8]) or int(lineParts[9]):
+                    color = (0, 0, 0)
+                image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
+            if percentage >= 0.01:
+                image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
+        else:
+            image = cv2.rectangle(image, (xmin, ymin), (xmax, ymax), color, 2)
+            if percentage < 0.01:
+                if int(lineParts[8]) or int(lineParts[9]):
+                    color = (0, 0, 0)
+                image = cv2.putText(image, str("%.3f" % percentage) + "%", (xmin, ymin - 8), cv2.FONT_HERSHEY_SIMPLEX, 1.e-2 * (ymax - ymin), color, 2)
 
         info.append([current_class, percentage, [xmin, xmax, ymin, ymax], color_name, lineParts[8:13]])
 

@@ -1,4 +1,4 @@
 #Prende le classi per la conversione, del tipo Classe_principale-sotto_classe1;sotto_classe2;...
 Person-Man;Woman;Boy;Girl
-Car-Truck;Limousine;Tank;Taxi;Van;Golf cart;Bus;Ambulance
+Car-Truck;Limousine;Taxi;Van;Golf cart;Bus;Ambulance
 Motorcycle-Bicycle;Unicycle
