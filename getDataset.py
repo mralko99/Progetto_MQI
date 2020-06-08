@@ -3,9 +3,10 @@ from os.path import isfile, isdir, join
 from shutil import copyfile
 from scandir import scandir
 import random as rnd
+from function import get_settings
 
 Modes = ["train", "validation"]
-Dataset_origine = "Dataset2/"
+Dataset_origine, A = get_settings()
 Dataset_destinazione = "BigData/"
 
 # Carico le classi dalle cartelle nel Dataset_origine

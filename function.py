@@ -1,18 +1,110 @@
-import csv
 import cv2
 import subprocess
 import numpy as np
+import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
+
+global s3
+s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+
+
+def download(id, directory):
+    modes = ["train", "validation", "test"]
+    # Incremento il counter
+    im = id
+
+    for iter_mode in modes:
+        current_bbox = grep(im, iter_mode)
+        if len(current_bbox) != 0:
+            curr_mode = iter_mode
+            break
+    # Scarico l'immagine richiesta
+    s3.download_file('open-images-dataset', curr_mode + '/' + im + '.jpg', directory + '/' + im + ".jpg")
+
+
+def processing(id, condizione, dict_list, classes, subclasses, directory_annotation, directory_image, directory_review, directory_download, Final_Size):
+    modes = ["train", "validation", "test"]
+
+    for iter_mode in modes:
+        current_bbox = grep(id, iter_mode)
+        if len(current_bbox) != 0:
+            runMode = iter_mode
+            break
+
+    # Faccio la grep (trovo le righe contenenti ...) con il nome della current_foto
+    current_bbox = grep(id, runMode)
+
+    # Creo una variabile vuota per memorizzare le bbox
+    current_bbox2 = []
+
+    for i in range(len(current_bbox)):
+        # Apro la linea per sapere che classe è
+        lineParts = current_bbox[i].split(',')
+
+        # Itero sulle classi di interesse
+        for intrest in classes:
+            # Se è una classe di interesse la copio
+            if lineParts[2] == dict_list[intrest]:
+                current_bbox2.append(current_bbox[i])
+                break
+
+        # Se non è scattata nessuna classe allora controllo le sottoclassi
+        if condizione:
+            # Itero sulle sottoclassi
+            for x in subclasses:
+                # Se una classe di interesse ha sottoclassi
+                if x[0] in classes:
+                    # Itero le sottoclassi di una classe di interesse
+                    for intrest in x[1]:
+                        # Se è presente
+                        if lineParts[2] == dict_list[intrest]:
+                            # Modifico la linea riscrivendo la classe di interesse al posto della sotto classe
+                            modified_bbox = [lineParts[0], lineParts[1], dict_list[x[0]]]
+                            for modified in lineParts[3:]:
+                                modified_bbox.append(modified)
+                            modified_bbox = ",".join(modified_bbox)
+                            # La copio sulle righe che mi interessano
+                            current_bbox2.append(modified_bbox)
+                            break
+
+    current_bbox = current_bbox2
+
+    # Leggo l'immagine che ho appena scaricato
+    image = cv2.imread(directory_download + '/' + id + ".jpg")
+
+    size = image.shape[:2]
+
+    xml_generator(runMode, Final_Size, size, current_bbox, directory_annotation, id, True)
+
+    image = image_resize(image, Final_Size, directory_image, id, True)
+
+    box_drawer(image, Final_Size, size, current_bbox, classes, directory_review, id, True)
+
+
+def regex_map(class_mode):
+    current_class = class_mode[0]
+    current_mode = class_mode[1]
+    current_id = []
+    current_bbox = grep(current_class, current_mode)
+    [current_id.append(line[:16]) for line in current_bbox]
+    return current_id
+
+
+def intrest(class_mode):
+    current_class = class_mode[0]
+    current_mode = class_mode[1]
+    current_bbox = grep(current_class, current_mode)
+    return current_bbox
 
 
 # Funzione che carica le subclasses dal file
 def get_subclass():
     subclasses = []
-    f = open("subclasses.names", "r", encoding="UTF-8")
-    cnt = 0
+    f = open("./names/subclasses.names", "r", encoding="UTF-8")
     for x in f:
         if x[0] != "#":
             subclasses.append([x.strip().split("-")[0], x.strip().split("-")[1].split(";")])
-            cnt += 1
     f.close()
     return subclasses
 
@@ -20,7 +112,7 @@ def get_subclass():
 # Funzione che carica i filter dal file
 def get_classfilter():
     classfilter = []
-    f = open("filter.names", "r", encoding="UTF-8")
+    f = open("./names/filter.names", "r", encoding="UTF-8")
     for x in f:
         if x[0] != "#":
             classfilter.append(x.strip())
@@ -32,7 +124,7 @@ def get_classfilter():
 def get_classqnt():
     classes = np.asarray([])
     load_qnt = np.asarray([])
-    f = open("classes.names", "r", encoding="UTF-8")
+    f = open("./names/classes.names", "r", encoding="UTF-8")
     for x in f:
         if x[0] != "#":
             classes = np.append(classes, x.strip().split("-")[0])
@@ -44,12 +136,34 @@ def get_classqnt():
 # Funzione che carico il dizionario con tutte le associazioni class:id(Predefinito) se inverted=False id:class
 def get_dict(inverted=True):
     f = open("./csv_folder/class-descriptions-boxable.csv", "r", encoding="UTF-8")
-    reader = csv.reader(f)
-    if inverted:
-        dict_list = {rows[1]: rows[0] for rows in reader}
-    else:
-        dict_list = {rows[0]: rows[1] for rows in reader}
+    dict_list = {}
+    for x in f:
+        if inverted:
+            dict_list[x.strip().split(",")[1]] = x.strip().split(",")[0]
+        else:
+            dict_list[x.strip().split(",")[0]] = x.strip().split(",")[1]
     return dict_list
+
+
+# Funzione che carica le subclasses dal file
+def get_settings():
+    f = open("./names/settings.names", "r", encoding="UTF-8")
+    Dataset = ''
+    Filtri = []
+    Filtri2 = []
+    for x in f:
+        if x[0] != "#":
+            if len(x.strip().split(",")) == 1:
+                Dataset = x.strip()
+            if len(x.strip().split(",")) == 5:
+                [Filtri2.append(y) for y in x.strip().split(",")]
+    f.close()
+    for x in Filtri2:
+        if x == '0':
+            Filtri.append(True)
+        else:
+            Filtri.append(False)
+    return Dataset, Filtri
 
 
 # Funzione ottimizzata per fare le regex
@@ -58,11 +172,6 @@ def grep(query, current_mode):
     finding = subprocess.run(commandStr.split(), stdout=subprocess.PIPE).stdout.decode('utf-8')
     finding = finding.splitlines()
     return finding
-
-
-# Funzione per scaricare i file
-def download(runMode, image, directory):
-    subprocess.run(['aws', 's3', '--no-sign-request', '--only-show-errors', 'cp', 's3://open-images-dataset/' + runMode + '/' + image + ".jpg", directory])
 
 
 def xml_generator(mode, dimension, original_size, current_bbox, directory=None, id=None, save=False):
@@ -188,6 +297,9 @@ def box_drawer(image, dimension, original_size, current_bbox, classes, directory
             xmax = int(float(lineParts[5]) * xRidimensionata + xOffset)
             ymin = int(float(lineParts[6]) * dimension)
             ymax = int(float(lineParts[7]) * dimension)
+
+        color = (0, 0, 0)
+        color_name = "Nero"
 
         # Scelgo il colore a seconda della classe
         if current_class == classes[0]:

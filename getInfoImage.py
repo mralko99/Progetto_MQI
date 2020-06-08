@@ -8,7 +8,7 @@ from function import get_dict, get_subclass, grep, download, image_resize, box_d
 dict_list = get_dict(inverted=False)  # Carico il dizionario con tutte le associazioni id:class
 dict_list2 = get_dict()               # Carico il dizionario con tutte le associazioni class:id
 subclasses = get_subclass()           # Carico se ci sono le classi con le loro sottoclassi
-change_label = True                  # Decide se cambiare le label delle sottoclassi
+change_label = False                  # Decide se cambiare le label delle sottoclassi
 Final_Size = 512
 
 modes = ["train", "validation", "test"]
@@ -58,7 +58,7 @@ else:
     #    print(i)
 
     # Scarico l'immagine richiesta
-    download(current_mode, photo_id, "./" + photo_id + ".jpg")
+    download(photo_id, "./")
 
     # Carico la foto da file
     image = imread(photo_id + ".jpg")

@@ -1,0 +1,5 @@
+#Inserire la cartella nella quale si vuole scaricare
+Dataset/
+#Inserire i Filtri
+# 0 Già Scaricate, 1 Classi filtro, 2 isGroup, 3 isDepiction, 4 Sottoclassi
+1,1,1,1,1
