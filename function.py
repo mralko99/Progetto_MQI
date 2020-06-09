@@ -54,7 +54,7 @@ def processing(id, dict_list, classes, subclasses, directory_annotation, directo
         # Itero sulle classi di interesse
         for intrest in classes:
             # Se è una classe di interesse la copio
-            if lineParts[2] == dict_list[intrest] and Filtri[3] != bool(int(lineParts[11])):
+            if lineParts[2] == dict_list[intrest] and not (Filtri[3] and bool(int(lineParts[11]))):
                 current_bbox2.append(current_bbox[i])
                 break
 
@@ -67,7 +67,7 @@ def processing(id, dict_list, classes, subclasses, directory_annotation, directo
                     # Itero le sottoclassi di una classe di interesse
                     for intrest in x[1]:
                         # Se è presente
-                        if lineParts[2] == dict_list[intrest] and Filtri[3] != bool(int(lineParts[11])):
+                        if lineParts[2] == dict_list[intrest] and not (Filtri[3] and bool(int(lineParts[11]))):
                             # Modifico la linea riscrivendo la classe di interesse al posto della sotto classe
                             modified_bbox = [lineParts[0], lineParts[1], dict_list[x[0]]]
                             for modified in lineParts[3:]:
@@ -76,6 +76,11 @@ def processing(id, dict_list, classes, subclasses, directory_annotation, directo
                             # La copio sulle righe che mi interessano
                             current_bbox2.append(modified_bbox)
                             break
+    if len(current_bbox2) == 0:
+        print(id)
+        for x in current_bbox:
+            print(not Filtri[3], bool(int(lineParts[11])), not (not Filtri[3] and bool(int(lineParts[11]))))
+            print(x, flush=True)
 
     current_bbox = current_bbox2
 

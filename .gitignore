@@ -1,5 +1,6 @@
 *.html
 *.jpg
 *Dataset*/
+*Verificato*/
 csv_folder/
 __pycache__/

@@ -1,5 +1,5 @@
 #Inserire la cartella nella quale si vuole scaricare
-Dataset/
+Sos
 #Inserire i Filtri
 # 0 Già Scaricate, 1 Classi filtro, 2 isGroup, 3 isDepiction, 4 Sottoclassi, 5 Percentage
 1,1,1,1,1,1

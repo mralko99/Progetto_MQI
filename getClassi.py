@@ -1,17 +1,18 @@
 from __future__ import division
 import os
+import sys
 import function
 import multiprocessing
 import numpy as np
 import random as rnd
 from shutil import rmtree
 from functools import partial
+from scandir import scandir
 
 # ImageID, Source, LabelName, Confidence, XMin, XMax, YMin, YMax, IsOccluded, IsTruncated, IsGroupOf, IsDepiction, IsInside, XClick1X, XClick2X, XClick3X, XClick4X, XClick1Y, XClick2Y, XClick3Y, XClick4Y
 # VARIABILI GLOBALI
 modes = ["train", "validation", "test"]     # Imposto le modes che andrà a scaricare
 Final_Size = 512                    # Imposto le dimensioni finali dell'immagine di output
-Dataset_filter = "BigData/"         # Imposto la directory dove andare a cercare i file già scaricati
 classes, qnt = function.get_classqnt()  # Carico le classi e le quantità associate
 class_filter = function.get_classfilter()    # Carico le classi che verranno filtrate dal download
 subclasses = function.get_subclass()         # Carico se ci sono le classi con le loro sottoclassi
@@ -19,13 +20,17 @@ dict_list = function.get_dict()               # Carico il dizionario con tutte l
 Dataset, Filtri = function.get_settings()                # Imposto la directory dove scaricare le foto per la review
 rnd.seed(50000)                        # Imposto il seed
 
+Dataset = "Dataset/Dataset_" + Dataset + "/"
+
+print("Sto creando \"Dataset_" + Dataset + "\"")
+
 
 # Cancello la cartella del dataset
 if os.path.isdir(Dataset):
     rmtree(Dataset, ignore_errors=True)
 # Creo di nuovo la cartella del dataset che adesso sarà vuota
 if not os.path.isdir(Dataset):
-    os.mkdir(Dataset)
+    os.makedirs(Dataset)
 # #
 
 if Filtri[0] or Filtri[1] or Filtri[2]:
@@ -36,10 +41,11 @@ downloaded = []
 
 if Filtri[0]:
     print('    Scaricate 100.00%', flush=True)
-    for runMode in modes:
-        downloaded_path = Dataset_filter + runMode + "/annotation/"
-        if os.path.isdir(downloaded_path) and Filtri[0]:
-            [downloaded.append(f[:16]) for f in os.listdir(downloaded_path) if os.path.isfile(os.path.join(downloaded_path, f))]
+    for directory in scandir("Verificato/"):
+        for runMode in modes:
+            downloaded_path = "Verificato/" + directory.name + "/" + runMode + "/annotation/"
+            if os.path.isdir(downloaded_path) and Filtri[0]:
+                [downloaded.append(f[:16]) for f in os.listdir(downloaded_path) if os.path.isfile(os.path.join(downloaded_path, f))]
 npFile = np.asarray(downloaded, dtype=str)
 
 
@@ -66,6 +72,7 @@ npFilter = np.intersect1d(npFilter, npFilter)
 
 
 filter23 = []
+filter23_id = []
 if Filtri[2]:
     intrest = []
     for x in classes:
@@ -80,7 +87,6 @@ if Filtri[2]:
         for y in modes:
             regex2 = dict_list[x] + "," + "[0-9][.]*[0-9]*," * 5 + "[0-1],[0-1],1,[0-1],[0-1]"
             filter23.append([regex2, y])
-    filter23_id = []
     filter23_bbox = []
     filter23_pool = multiprocessing.Pool(multiprocessing.cpu_count())
     res = filter23_pool.map_async(function.regex_map, filter23, callback=filter23_bbox.append)
@@ -180,19 +186,21 @@ for ind in range(len(classes)):
 
     if not os.path.isdir(directory_image):
         os.makedirs(directory_image)
-    if not os.path.isdir(directory_annotation):
-        os.makedirs(directory_annotation)
-    if not os.path.isdir(directory_review):
-        os.makedirs(directory_review)
 
     # Scarico le immagini
     download_pool = multiprocessing.Pool(multiprocessing.cpu_count())
     download_init = partial(function.download,
                             directory=directory_image)
-    res = download_pool.map_async(download_init, npImage)
-    function.track_job(res, len(npImage), "Scaricati")
+    for i, _ in enumerate(download_pool.imap(download_init, npImage), 1):
+        sys.stderr.write('\r    Scaricati {:.2f}%'.format(float(i) / len(npImage) * 100))
+    print()
     download_pool.close()
     download_pool.join()
+
+    if not os.path.isdir(directory_annotation):
+        os.makedirs(directory_annotation)
+    if not os.path.isdir(directory_review):
+        os.makedirs(directory_review)
 
     # Processo le immagini
     processing_pool = multiprocessing.Pool(multiprocessing.cpu_count())
@@ -205,10 +213,10 @@ for ind in range(len(classes)):
                               directory_review=directory_review,
                               Final_Size=Final_Size,
                               Filtri=Filtri)
-    res = processing_pool.map_async(processing_init, npImage)
-    function.track_job(res, len(npImage), "Processati")
+    for i, _ in enumerate(processing_pool.imap(processing_init, npImage), 1):
+        sys.stderr.write('\r    Processati {:.2f}%'.format(float(i) / len(npImage) * 100))
+    print()
     processing_pool.close()
     processing_pool.join()
 
     print()
-

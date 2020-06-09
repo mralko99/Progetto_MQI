@@ -3,49 +3,65 @@ from os.path import isfile, isdir, join
 from shutil import copyfile
 from scandir import scandir
 import random as rnd
-from function import get_settings
 
 Modes = ["train", "validation"]
-Dataset_origine, A = get_settings()
-Dataset_destinazione = "BigData/"
+directory_dataset = []
+dataset_reviewed = []
 
-# Carico le classi dalle cartelle nel Dataset_origine
-classes = []
-for entry in scandir(Dataset_origine):
-    classes.append(entry.name)
+if not isdir("Verificato/"):
+    makedirs("Verificato/")
+if not isdir("Dataset/"):
+    makedirs("Dataset/")
 
-# Creo le directory per Dataset_destinazione image e annotation
-for current_mode in Modes:
-    directory_image = Dataset_destinazione + current_mode + '/image/'
-    directory_annotation = Dataset_destinazione + current_mode + '/annotation/'
-    if not isdir(directory_image):
-        makedirs(directory_image)
-    if not isdir(directory_annotation):npFilter = np.intersect1d(npFilter, npFilter)
-        makedirs(directory_annotation)
+for directory in scandir("Verificato/"):
+    if isdir("Verificato/" + directory.name) and "Verificato" in directory.name:
+        dataset_reviewed.append(directory.name.split("_")[1])
 
-# Copio i file che sono presenti in tutte le review in image e annotation
-for current_class in classes:
-    path = Dataset_origine + current_class + "/review/"
-    nomi = [f for f in listdir(path) if isfile(join(path, f))]
+for directory in scandir("Dataset/"):
+    if isdir("Dataset/" + directory.name) and "Dataset" in directory.name and directory.name.split("_")[1] not in dataset_reviewed:
+        directory_dataset.append(directory.name.split("_")[1])
 
-    rnd.seed(80)
-    rnd.shuffle(nomi)
+for dirs in directory_dataset:
+    Dataset_origine = "Dataset/Dataset_" + dirs + "/"
+    Dataset_destinazione = "Verificato/Verificato_" + dirs + "/"
 
-    train = nomi[:int(len(nomi) * 0.8)]
-    validation = nomi[int(len(nomi) * 0.8):]
-    for photo in train:
-        id = photo[:16]
+    # Carico le classi dalle cartelle nel Dataset_origine
+    classes = []
+    for entry in scandir(Dataset_origine):
+        classes.append(entry.name)
 
-        copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
-                 Dataset_destinazione + "train/annotation/" + id + ".xml")
+    # Creo le directory per Dataset_destinazione image e annotation
+    for current_mode in Modes:
+        directory_image = Dataset_destinazione + current_mode + '/image/'
+        directory_annotation = Dataset_destinazione + current_mode + '/annotation/'
+        if not isdir(directory_image):
+            makedirs(directory_image)
+        if not isdir(directory_annotation):
+            makedirs(directory_annotation)
 
-        copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
-                 Dataset_destinazione + "train/image/" + id + ".jpg")
-    for photo in validation:
-        id = photo[:16]
+    # Copio i file che sono presenti in tutte le review in image e annotation
+    for current_class in classes:
+        path = Dataset_origine + current_class + "/review/"
+        nomi = [f for f in listdir(path) if isfile(join(path, f))]
 
-        copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
-                 Dataset_destinazione + "validation/annotation/" + id + ".xml")
+        rnd.seed(80)
+        rnd.shuffle(nomi)
 
-        copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
-                 Dataset_destinazione + "validation/image/" + id + ".jpg")
+        train = nomi[:int(len(nomi) * 0.8)]
+        validation = nomi[int(len(nomi) * 0.8):]
+        for photo in train:
+            id = photo[:16]
+
+            copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
+                     Dataset_destinazione + "train/annotation/" + id + ".xml")
+
+            copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
+                     Dataset_destinazione + "train/image/" + id + ".jpg")
+        for photo in validation:
+            id = photo[:16]
+
+            copyfile(Dataset_origine + current_class + "/annotation/" + id + ".xml",
+                     Dataset_destinazione + "validation/annotation/" + id + ".xml")
+
+            copyfile(Dataset_origine + current_class + "/image/" + id + ".jpg",
+                     Dataset_destinazione + "validation/image/" + id + ".jpg")
