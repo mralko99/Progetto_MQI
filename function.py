@@ -76,11 +76,6 @@ def processing(id, dict_list, classes, subclasses, directory_annotation, directo
                             # La copio sulle righe che mi interessano
                             current_bbox2.append(modified_bbox)
                             break
-    if len(current_bbox2) == 0:
-        print(id)
-        for x in current_bbox:
-            print(not Filtri[3], bool(int(lineParts[11])), not (not Filtri[3] and bool(int(lineParts[11]))))
-            print(x, flush=True)
 
     current_bbox = current_bbox2
 
